@@ -1,0 +1,78 @@
+version: '3.8'
+
+
+services:
+  app:
+    image: 'app-metric:latest'
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app-metric
+    depends_on:
+      - db
+    ports:
+      - '8077:8077'
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/app-metric?allowPublicKeyRetrieval=true&useSSL=false
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD}
+    networks:
+      - app-metric
+
+  # MySQL db
+  db:
+    container_name: db
+    image: 'mysql:latest'
+    ports:
+      - "3366:3306"
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - app-metric
+
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - app-metric
+
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - app-metric
+
+# Volumes for persistent data
+volumes:
+  db-data:
+  grafana-data:
+  prometheus-data:
+
+# network
+networks:
+  app-metric:
+    driver: bridge
